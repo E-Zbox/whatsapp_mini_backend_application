@@ -1,0 +1,27 @@
+exports.handleEndpointNotFound = (method, endpoint) =>
+    `[ ${method} ] '${endpoint}' does not exist`;
+
+exports.handleUserAlreadyExists = (phone) =>
+    `User with phone: \`${phone}\` already exists`;
+
+exports.handleUserNotFound = (phone) =>
+    `User with phone: \`${phone}\` not found`;
+
+exports.handleRoomNotFound = (payload) =>
+    `Room with ${JSON.stringify(payload)} not found`;
+
+exports.throwError = (error) => {
+    throw new Error(error);
+};
+
+exports.constructErrorMessage = (message, status = 500) => ({
+    message,
+    status,
+});
+
+exports.constructSocketResponse = (data, success = false) => ({
+    data,
+    success,
+});
+
+exports.SERVER_ERR = "Something went wrong";
