@@ -13,10 +13,12 @@ const groupInfoSchema = new Schema(
         description: {
             type: String,
             required: false,
+            default: "",
         },
         profile: {
             type: String,
             required: false,
+            default: "",
         },
     },
     { _id: false }

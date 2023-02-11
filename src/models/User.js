@@ -11,6 +11,7 @@ const userSchema = new Schema({
     },
     about: {
         type: String,
+        default: "",
     },
     phone: {
         type: Number,
@@ -27,6 +28,7 @@ const userSchema = new Schema({
     },
     profile: {
         type: String,
+        default: "",
     },
     online_status: {
         type: Boolean,
@@ -61,7 +63,7 @@ const userSchema = new Schema({
         required: true,
     },
     socket: {
-        type: Object,
+        type: { id: String },
         required: false,
     },
 });

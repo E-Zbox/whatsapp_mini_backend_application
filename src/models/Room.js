@@ -27,6 +27,7 @@ const roomSchema = new Schema({
     name: {
         type: String,
         required: true,
+        unique: true,
         /**
          * creator_id:recepient_id
          * where creator_id is the id of the user that started chat in this room
