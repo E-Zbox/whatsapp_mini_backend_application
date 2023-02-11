@@ -33,6 +33,7 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => {
         // console.log("filename [line 34] >> ", file);
         let filename = `(${Date.now()}) ${file.originalname}`;
+        // console.log({filename})
         cb(null, filename);
     },
 });
