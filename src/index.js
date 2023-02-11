@@ -13,6 +13,8 @@ const { Server } = require("socket.io");
 // config
 const { connectToDb } = require("./config/database");
 const { handleEndpointNotFound, SERVER_ERR } = require("./config/error");
+// handle socket disconnect
+const { handleDisconnect } = require("./middlewares/socket");
 // routes
 const {
     socketRoutes: { initializeMessageIO, initializeRoomIO },
@@ -41,11 +43,13 @@ app.use(`${baseUrl}/auth/user`, userRoutes);
 
 io.of(baseSocketUrl, (socket) => {
     console.log("Welcome to server");
+
+    socket.on("disconnect", (payload) => handleDisconnect(payload, socket, io));
 });
 
 // initalize socket routes
-initializeMessageIO(io, baseSocketUrl);
-initializeRoomIO(io, baseSocketUrl);
+initializeMessageIO(io, baseSocketUrl, handleDisconnect);
+initializeRoomIO(io, baseSocketUrl, handleDisconnect);
 
 // error handlers
 app.use((err, req, res, next) => {
