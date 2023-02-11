@@ -19,9 +19,4 @@ exports.constructErrorMessage = (message, status = 500) => ({
     status,
 });
 
-exports.constructSocketResponse = (data, success = false) => ({
-    data,
-    success,
-});
-
 exports.SERVER_ERR = "Something went wrong";
