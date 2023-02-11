@@ -43,6 +43,21 @@ exports.findOneUser = async (phone) => {
     }
 };
 
+exports.findOneUserWithPayload = async (payload) => {
+    let response = { data: null, error: "", success: false };
+    try {
+        let data = await User.findOne(payload);
+
+        if (!data) throwError(handleUserNotFound(phone));
+
+        response = { ...response, data, success: true };
+    } catch (error) {
+        response = { ...response, error: error.message };
+    } finally {
+        return response;
+    }
+};
+
 /**
  * @param {Number} phone 234-xxx-YYYY-xxx
  * @param {Object} payload {name, about, profile, show_online_status, ... except phone}
@@ -74,7 +89,7 @@ exports.updateOneUser = async (phone, payload) => {
 };
 
 exports.signUserPayload = (payload, secretKey) => {
-    return jwt.sign(payload, secretKey, { expiresIn: "50min" });
+    return jwt.sign(payload, secretKey, { expiresIn: "2hr" });
 };
 
 exports.verifyUserToken = (token, secretKey) => {

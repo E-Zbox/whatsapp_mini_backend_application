@@ -40,22 +40,6 @@ exports.findOneRoom = async (payload) => {
     }
 };
 
-// this function is redundant
-exports.getRoomMessages = async (_id) => {
-    let response = { data: null, error: "", success: false };
-    try {
-        let data = await Room.findOne({ _id });
-
-        if (!data) throwError(handleRoomNotFound({ _id }));
-
-        response = { ...response, data, success: true };
-    } catch (error) {
-        response = { ...response, error: error.message };
-    } finally {
-        return response;
-    }
-};
-
 exports.updateRoomMessages = async (_id, message_id) => {
     /**
      * add message to a room by `_id`

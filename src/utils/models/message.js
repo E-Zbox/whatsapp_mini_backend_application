@@ -38,3 +38,33 @@ exports.deleteMessage = async (_id) => {
         return response;
     }
 };
+
+exports.getRoomMessages = async (room_id) => {
+    let response = { data: null, error: "", success: false };
+    try {
+        let data = await Message.find({ room_id });
+        response = { ...response, data, success: true };
+    } catch (error) {
+        response = { ...response, error: error.message };
+    } finally {
+        return response;
+    }
+};
+
+/**
+ *
+ * @param {ObjectId} _id
+ * @param {object} payload { date_delivered: Number}
+ * @returns {}
+ */
+exports.updateMessage = async (_id, payload) => {
+    let response = { data: null, error: "", success: false };
+    try {
+        let data = await Message.findOneAndUpdate({ _id }, payload);
+        response = { ...response, data, success: true };
+    } catch (error) {
+        response = { ...response, error: error.message };
+    } finally {
+        return response;
+    }
+};
