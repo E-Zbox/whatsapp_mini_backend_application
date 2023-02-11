@@ -31,7 +31,9 @@ exports.updateProfileController = async (req, res) => {
     } = await findOneUser(phone);
 
     // delete previous profile
-    if (profile) fs.unlinkSync(profile);
+    fs.exists(profile, (exist)=> {
+        if (exist && profile) fs.unlinkSync(profile)
+    })
 
     await updateOneUser(phone, { profile: filepath });
 
