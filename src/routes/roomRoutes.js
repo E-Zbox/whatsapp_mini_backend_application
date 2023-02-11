@@ -4,8 +4,13 @@ const { roomIOController } = require("../controllers/roomController");
 const { socketVerifyToken } = require("../middlewares/authenticate");
 const { updateUserSocket } = require("../middlewares/socket");
 
-exports.initializeRoomIO = (io, baseSocketUrl) => {
-    io.of(`${baseSocketUrl}/room`, (socket) => roomIOController(io, socket))
+exports.initializeRoomIO = (io, baseSocketUrl, handleDisconnect) => {
+    io.of(`${baseSocketUrl}/room`, (socket) => {
+        socket.on("disconnect", (payload) =>
+            handleDisconnect(payload, socket, io)
+        );
+        roomIOController(io, socket);
+    })
         .use(socketVerifyToken)
         .use(updateUserSocket);
 };

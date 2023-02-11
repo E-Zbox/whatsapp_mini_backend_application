@@ -12,9 +12,9 @@ const parseFileUpload = require("../middlewares/fileUpload");
 Router.post("/sign-up", signUpController).post("/sign-in", signInController);
 
 Router.post(
-    "/profile/upload",
+    "/profile/upload",[
     verifyToken,
-    parseFileUpload,
+    parseFileUpload],
     updateProfileController
 );
 module.exports = Router;
