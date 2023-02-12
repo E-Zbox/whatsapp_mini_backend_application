@@ -6,6 +6,7 @@ const { throwError } = require("../../config/error");
 // event emitters
 const {
     displayError,
+    displayPayloadError,
     groupMessageSent,
     groupMessagesNotFound,
     groupRoomCreated,
@@ -28,7 +29,11 @@ const {
 const { constructSocketResponse } = require("../../utils/controllers/payload");
 // utils
 const { createAdminPayload } = require("../../utils/controllers/payload");
-const { createGroupRoom } = require("../../utils/models/group_room");
+const { createGroupMessage } = require("../../utils/models/group_message");
+const {
+    createGroupRoom,
+    findOneGroupRoom,
+} = require("../../utils/models/group_room");
 const {
     createMessage,
     getRoomMessages,
@@ -309,7 +314,7 @@ exports.functions = {
 
         if (!_phone) {
             return socket.emit(
-                displayError,
+                displayPayloadError,
                 constructSocketResponse(
                     "No phone was provided. Confirm payload object and try again!"
                 )
@@ -548,6 +553,139 @@ exports.functions = {
     },
     /**
      *
+     * @param {object} payload {body, group_room_id}
+     * @param {*} socket
+     * @param {*} io
+     */
+    createGroupMessage: async (payload, socket, io) => {
+        /**
+         * certain validations are performed such as
+         * validating `body` and `group_room_id` from payload.
+         * : body must be a string
+         * : group_room_id must exist
+         * >> if validation fails
+         *      - an event is emitted (display_payload_error) to the user
+         * validate that socket.user._id is a member of a room
+         * >> if validation fails
+         *      - an event is emitted (display_error) to the user
+         * >> else, create group message with necessary fields
+         *      add current `user` socket to group_room `_id`
+         *      add any other group room members that are online but not in group room to group room
+         *      - an event is emtted (group_message_sent) to group_room
+         */
+        let { body, group_room_id } = payload;
+        console.log({ payload });
+
+        if (!body || !group_room_id) {
+            return socket.emit(
+                displayPayloadError,
+                constructSocketResponse(
+                    "Payload must contain `body` and valid `group_room_id`"
+                )
+            );
+        }
+
+        try {
+            let userId = ObjectId(socket.user._id);
+            group_room_id = ObjectId(group_room_id);
+            console.log(
+                `Are you the source of the code blocking⁉ ${group_room_id}`
+            );
+
+            let groupRoom = await findOneGroupRoom(group_room_id);
+            console.log({ groupRoom });
+
+            if (!groupRoom.success) {
+                return socket.emit(
+                    groupRoomNotFound,
+                    constructSocketResponse(groupRoom.error, groupRoom.success)
+                );
+            }
+
+            // check if socket.user._id is a member of group room
+            if (!groupRoom.data.members.includes(userId)) {
+                return socket.emit(
+                    displayError,
+                    constructSocketResponse(
+                        "Current socket.user._id is not a member of this group room",
+                        false
+                    )
+                );
+            }
+
+            console.log("[ 612] about to createGroupMessage...");
+
+            let newGroupMessage = await createGroupMessage({
+                body,
+                deleted: false,
+                delivered_to: [],
+                group_room_id,
+                seen_by: [],
+                sender: userId,
+            });
+
+            if (!newGroupMessage.success) {
+                return socket.emit(
+                    displayError,
+                    constructSocketResponse(newGroupMessage.error)
+                );
+            }
+
+            console.log(
+                "Message got created successfully. Let's see what's next! 🤩"
+            );
+
+            // add online group room members not in group room to group room
+            const group_room_name = String(group_room_id);
+            socket.join(group_room_name);
+
+            const sockets = Array.from(io.of(socket.nsp.name).sockets);
+
+            const groupRoomMembersPromise = groupRoom.members.map(
+                async (_id) => {
+                    let { data, error, success } = await findOneUserWithPayload(
+                        { _id }
+                    );
+
+                    if (!success) throwError(error);
+                    console.log("found group member", data.name);
+
+                    if (data.online_status) {
+                        sockets.forEach(([_socketId, _socket]) => {
+                            if (_socketId == data.socket.id) {
+                                _socket.join(group_room_name);
+                                console.log(
+                                    `${data.name} joined group room ${group_room_name}`
+                                );
+                            }
+                        });
+                    }
+                }
+            );
+
+            Promise.all(groupRoomMembersPromise)
+                .then(() => {
+                    console.log("[ 660 ] it is done 🔚💯");
+                    io.of(socket.nsp.name)
+                        .to(group_room_name)
+                        .emit(
+                            groupMessageSent,
+                            constructSocketResponse(
+                                newGroupMessage.data,
+                                newGroupMessage.success
+                            )
+                        );
+                })
+                .catch((err) => throwError(err));
+        } catch (error) {
+            return socket.emit(
+                displayError,
+                constructSocketResponse(error.message)
+            );
+        }
+    },
+    /**
+     *
      * @param {object} payload {
      *      name, members: at least an array of one element
      * }
@@ -571,7 +709,7 @@ exports.functions = {
 
         if (!name || !members) {
             return socket.emit(
-                displayError,
+                displayPayloadError,
                 constructSocketResponse(
                     "Payload must contain `name` and `members`",
                     false
@@ -590,102 +728,118 @@ exports.functions = {
                 )
             );
         }
+        console.log(
+            members.length == 1 && members.includes(socket.user._id),
+            members,
+            socket.user._id,
+            members.length,
+            members.includes(socket.user._id)
+        );
 
         let userId = ObjectId(socket.user._id);
 
-        members = [userId, ...members.map((member_id) => ObjectId(member_id))];
+        members = [...new Set([socket.user._id, ...members])];
+
+        members = members.map((member_id) => ObjectId(member_id));
 
         // we check if the members exist
-        members.forEach(async (member_id) => {
+        let membersPromises = members.map(async (member_id) => {
+            // we don't use async/await here because we want the rest of the code to wait for this validation
             if (member_id !== userId) {
                 let userExist = await findOneUserWithPayload({
                     _id: member_id,
                 });
 
                 if (!userExist.success) {
+                    throwError(userExist.error);
+                }
+            }
+        });
+
+        Promise.all(membersPromises)
+            .then(async () => {
+                let newGroupRoom = await createGroupRoom({
+                    admins: [userId],
+                    edit_group_info: false,
+                    group_info: { name, description: "", profile: "" },
+                    locked: { bool: false, by: userId, timestamp: Date.now() },
+                    members,
+                    messages: [],
+                });
+
+                if (!newGroupRoom.success) {
                     return socket.emit(
                         displayError,
-                        constructSocketResponse(userExist.error)
+                        constructSocketResponse(newGroupRoom.error)
                     );
                 }
-            }
-        });
 
-        let newGroupRoom = await createGroupRoom({
-            admins: [userId],
-            edit_group_info: false,
-            group_info: { name, description: "", profile: "" },
-            locked: { bool: false, by: userId, timestamp: Date.now() },
-            members,
-            messages: [],
-        });
+                // update all members (user) `group_rooms` property
+                // i think this operation is expensive (computationally)
+                const _io = io.of(socket.nsp.name);
+                const sockets = Array.from(_io.sockets);
+                const group_room_name = newGroupRoom.data._id;
 
-        if (!newGroupRoom.success) {
-            return socket.emit(
-                displayError,
-                constructSocketResponse(newGroupRoom.error)
-            );
-        }
+                members.forEach(async (_id) => {
+                    let {
+                        data: {
+                            name,
+                            about,
+                            phone,
+                            profile,
+                            group_rooms,
+                            online_status,
+                            show_online_status,
+                            last_seen_status,
+                            show_last_seen_status,
+                            socket: { id: memberSocketId },
+                        },
+                    } = await findOneUserWithPayload({ _id });
 
-        // update all members (user) `group_rooms` property
-        // i think this operation is expensive (computationally)
-        const _io = io.of(socket.nsp.name);
-        const sockets = Array.from(_io.sockets);
-        const group_room_name = newGroupRoom.data._id;
+                    group_rooms.push(group_room_name);
+                    await updateOneUser(phone, { group_rooms });
 
-        members.forEach(async (_id) => {
-            let {
-                data: {
-                    name,
-                    about,
-                    phone,
-                    profile,
-                    group_rooms,
-                    online_status,
-                    show_online_status,
-                    last_seen_status,
-                    show_last_seen_status,
-                    socket: { id: memberSocketId },
-                },
-            } = await findOneUserWithPayload({ _id });
+                    if (_id == userId) {
+                        // we use new group room _id as room name
+                        socket.join(group_room_name);
+                    } else {
+                        // check if member is online
+                        if (online_status) {
+                            sockets.forEach(([_socketId, _socket]) => {
+                                if (_socket.id == memberSocketId) {
+                                    _socket.join(group_room_name);
 
-            group_rooms.push(group_room_name);
-            await updateOneUser(phone, { group_rooms });
+                                    let _payload = {
+                                        name,
+                                        about,
+                                        profile,
+                                        online_status,
+                                        show_online_status,
+                                        last_seen_status,
+                                        show_last_seen_status,
+                                    };
 
-            if (_id == userId) {
-                // we use new group room _id as room name
-                socket.join(group_room_name);
-            } else {
-                // check if member is online
-                if (online_status) {
-                    sockets.forEach(([_socketId, _socket]) => {
-                        if (_socket.id == memberSocketId) {
-                            _socket.join(group_room_name);
-
-                            let _payload = {
-                                name,
-                                about,
-                                profile,
-                                online_status,
-                                show_online_status,
-                                last_seen_status,
-                                show_last_seen_status,
-                            };
-
-                            _io.to(group_room_name).emit(
-                                groupRoomNewMemberJoined,
-                                constructSocketResponse(_payload, true)
-                            );
+                                    _io.to(group_room_name).emit(
+                                        groupRoomNewMemberJoined,
+                                        constructSocketResponse(_payload, true)
+                                    );
+                                }
+                            });
                         }
-                    });
-                }
-            }
+                    }
+                });
 
-            return socket.emit(
-                groupRoomCreated,
-                constructSocketResponse(newGroupRoom.data, true)
+                return socket.emit(
+                    groupRoomCreated,
+                    constructSocketResponse(newGroupRoom.data, true)
+                );
+            })
+            .catch((err) =>
+                socket.emit(
+                    displayError,
+                    constructSocketResponse(err.message, false)
+                )
             );
-        });
     },
     /**
      *
@@ -736,13 +890,16 @@ exports.functions = {
             } = data;
 
             let _payload = {
-                name,
-                about,
-                profile,
-                online_status,
-                show_online_status,
-                last_seen_status,
-                show_last_seen_status,
+                group_room,
+                user: {
+                    name,
+                    about,
+                    profile,
+                    online_status,
+                    show_online_status,
+                    last_seen_status,
+                    show_last_seen_status,
+                },
             };
 
             io.of(socket.nsp.name)
