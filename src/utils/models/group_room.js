@@ -1,3 +1,5 @@
+// error
+const { handleRoomNotFound, throwError } = require("../../config/error");
 // model
 const { GroupRoom } = require("../../models");
 
@@ -26,7 +28,22 @@ exports.createGroupRoom = async (payload) => {
     }
 };
 
-exports.updateGroupInfo = async (_id, payload) => {
+exports.findOneGroupRoom = async (_id) => {
+    let response = { data: null, error: "", success: false };
+    try {
+        let data = await GroupRoom.find({ _id });
+
+        if (!data) throwError(handleRoomNotFound({ _id }));
+
+        response = { ...response, data, success: true };
+    } catch (error) {
+        response = { ...response, error: error.message };
+    } finally {
+        return response;
+    }
+};
+
+exports.updateGroupRoom = async (_id, payload) => {
     /**
      * @payload : {
      *      name, description, profile
@@ -36,7 +53,7 @@ exports.updateGroupInfo = async (_id, payload) => {
     try {
         let data = await GroupRoom.findOneAndUpdate(
             { _id },
-            { group_info: payload },
+            { ...payload },
             { new: true }
         );
         response = { ...response, data, success: true };
