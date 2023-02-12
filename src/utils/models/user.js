@@ -48,7 +48,7 @@ exports.findOneUserWithPayload = async (payload) => {
     try {
         let data = await User.findOne(payload);
 
-        if (!data) throwError(handleUserNotFound(phone));
+        if (!data) throwError(handleUserNotFound(payload));
 
         response = { ...response, data, success: true };
     } catch (error) {
