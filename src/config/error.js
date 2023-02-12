@@ -4,8 +4,8 @@ exports.handleEndpointNotFound = (method, endpoint) =>
 exports.handleUserAlreadyExists = (phone) =>
     `User with phone: \`${phone}\` already exists`;
 
-exports.handleUserNotFound = (phone) =>
-    `User with phone: \`${phone}\` not found`;
+exports.handleUserNotFound = (payload) =>
+    `User with payload: \`${JSON.stringify(payload)}\` not found`;
 
 exports.handleRoomNotFound = (payload) =>
     `Room with ${JSON.stringify(payload)} not found`;
