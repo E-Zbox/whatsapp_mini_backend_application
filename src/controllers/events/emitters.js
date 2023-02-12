@@ -4,6 +4,7 @@
  */
 module.exports = {
     displayError: "display_error",
+    displayPayloadError: "display_payload_error",
     groupMessageCreated: "group_message_created",
     groupMessageSent: "group_message_sent",
     groupMessagesNotFound: "group_messages_not_found",
